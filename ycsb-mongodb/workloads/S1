@@ -18,6 +18,7 @@ fieldlength=64
 fieldcount=1
 
 target=10000
+# refer to http://api.mongodb.com/java/3.1/?com/mongodb/ConnectionString.html
 mongodb.url=mongodb://127.0.0.1:7001/ycsb?maxPoolSize=1000&safe=true&streamtype=netty
 mongodb.writeConcern=acknowledged
 threadcount=2

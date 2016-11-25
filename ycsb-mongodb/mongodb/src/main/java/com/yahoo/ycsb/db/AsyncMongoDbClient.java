@@ -53,7 +53,7 @@ public class AsyncMongoDbClient extends DB {
     private static MongoClient mongo;
 
     private static MongoDatabase db;
-    
+
     /** The default write concern for the test. */
     private static WriteConcern writeConcern;
 
@@ -112,6 +112,7 @@ public class AsyncMongoDbClient extends DB {
                 }
                 db = mongo.getDatabase(database);
                 System.out.println("mongo connection created with " + urls);
+                // drop database
                 if (dropData == 1) {
                     final CountDownLatch dropLatch = new CountDownLatch(1);
                     db.drop(new SingleResultCallback<Void>() {
@@ -135,14 +136,14 @@ public class AsyncMongoDbClient extends DB {
 
     @Override
     public void cleanup() throws DBException {
-        long st=System.nanoTime();
+        //long st=System.nanoTime();
         if (initCount.decrementAndGet() <= 0) {
             try {
                 mongo.close();
             } catch (Exception e1) { /* ignore */ }
         }
-        long en=System.nanoTime();
-        _measurements.measure("CLEANUP", (int)((en-st)/1000));
+        //long en=System.nanoTime();
+        //_measurements.measure("CLEANUP", (int)((en-st)/1000));
     }
 
     private byte[] applyCompressibility(byte[] data){
@@ -165,18 +166,14 @@ public class AsyncMongoDbClient extends DB {
         SingleResultCallback<Document> printDocument = new SingleResultCallback<Document>() {
             @Override
             public void onResult(final Document document, final Throwable t) {
+                int ret = 0;
                 if (t != null) {
                     System.err.println("Couldn't read key ");
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    return;
+                    ret = 1;
                 }
                 long en = System.nanoTime();
                 _measurements.measure("READ",(int)((en-st)/1000));
-                _measurements.reportReturnCode("READ", 0);
+                _measurements.reportReturnCode("READ", ret);
             }
         };
 
@@ -208,19 +205,15 @@ public class AsyncMongoDbClient extends DB {
             SingleResultCallback<Void> callbackWhenFinished = new SingleResultCallback<Void>() {
                 @Override
                 public void onResult(final Void result, final Throwable t) {
+                    int ret = 0;
                     if (t != null) {
                         System.err.println("Couldn't scan key ");
                         t.printStackTrace();
-                        try {
-                            Thread.sleep(1);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        return;
+                        ret = 1;
                     }
                     long en=System.nanoTime();
                     _measurements.measure("SCAN",(int)((en-st)/1000));
-                    _measurements.reportReturnCode("SCAN", 0);
+                    _measurements.reportReturnCode("SCAN", ret);
                 }
             };
             MongoCollection<Document> collection = db.getCollection(table);
@@ -251,19 +244,15 @@ public class AsyncMongoDbClient extends DB {
             SingleResultCallback<UpdateResult> printDocument = new SingleResultCallback<UpdateResult>() {
                 @Override
                 public void onResult(final UpdateResult result, final Throwable t) {
+                    int ret = 0;
                     if (t != null) {
                         System.err.println("Couldn't update key ");
                         t.printStackTrace();
-                        try {
-                            Thread.sleep(1);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        return;
+                        ret = 1;
                     }
                     long en=System.nanoTime();
                     _measurements.measure("UPDATE",(int)((en-st)/1000));
-                    _measurements.reportReturnCode("UPDATE", 0);
+                    _measurements.reportReturnCode("UPDATE", ret);
                 }
             };
             MongoCollection<Document> collection = db.getCollection(table);
@@ -290,7 +279,7 @@ public class AsyncMongoDbClient extends DB {
                       HashMap<String, ByteIterator> values) {
 
         final long st = System.nanoTime();
-        //final CountDownLatch dropLatch = new CountDownLatch(1);
+
         MongoCollection<Document> collection = db.getCollection(table);
         Document r = new Document("_id", key);
         for (String k : values.keySet()) {
@@ -301,19 +290,16 @@ public class AsyncMongoDbClient extends DB {
         collection.insertOne(r, new SingleResultCallback<Void>() {
             @Override
             public void onResult(final Void result, final Throwable t) {
+                int ret = 0;
                 if (t != null) {
                     System.err.println("Couldn't insert key ");
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    return;
+                    ret = 1;
+                    //return;
                 }
-                //dropLatch.countDown();
+
                 long en = System.nanoTime();
                 _measurements.measure("INSERT",(int)((en-st)/1000));
-                _measurements.reportReturnCode("INSERT", 0);
+                _measurements.reportReturnCode("INSERT", ret);
             }
         });
 
@@ -328,17 +314,13 @@ public class AsyncMongoDbClient extends DB {
         collection.deleteOne(Filters.eq("_id", key), new SingleResultCallback<DeleteResult>() {
             @Override
             public void onResult(final DeleteResult result, final Throwable t) {
+                int ret = 0;
                 if (t != null) {
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    return;
+                    ret = 1;
                 }
                 long en=System.nanoTime();
                 _measurements.measure("DELETE",(int)((en-st)/1000));
-                _measurements.reportReturnCode("DELETE", 0);
+                _measurements.reportReturnCode("DELETE", ret);
             }
         });
         return 0;
