@@ -1,14 +1,15 @@
 recordcount=5000000
 operationcount=1000000
-insertcount=1000000
+
 workload=com.yahoo.ycsb.workloads.MutiWorkload
+maxexecutiontime=180
 
 readallfields=false
 
-readproportion=0
+readproportion=1
 updateproportion=0
 scanproportion=0
-insertproportion=1
+insertproportion=0
 
 requestdistribution=uniform
 
@@ -18,7 +19,8 @@ fieldlength=64
 fieldcount=1
 
 target=10000
-mongodb.url=mongodb://127.0.0.1:7001/ycsb?maxPoolSize=1000&safe=true&streamtype=netty
+mongodb.url=mongodb://127.0.0.1:7001/ycsb?maxPoolSize=100&safe=true&streamtype=netty
 mongodb.writeConcern=acknowledged
+mongodb.drop=0
 threadcount=2
-mongodb.drop=1
+

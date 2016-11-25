@@ -1,12 +1,12 @@
-/**                                                                                                                                                                                
+/**
  * Copyright (c) 2010 Yahoo! Inc. All rights reserved.                                                                                                                             
- *                                                                                                                                                                                 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you                                                                                                             
  * may not use this file except in compliance with the License. You                                                                                                                
  * may obtain a copy of the License at                                                                                                                                             
- *                                                                                                                                                                                 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0                                                                                                                                      
- *                                                                                                                                                                                 
+ *
  * Unless required by applicable law or agreed to in writing, software                                                                                                             
  * distributed under the License is distributed on an "AS IS" BASIS,                                                                                                               
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or                                                                                                                 
@@ -24,29 +24,33 @@ import java.util.Properties;
  */
 public class DBFactory
 {
-      @SuppressWarnings("unchecked")
+	@SuppressWarnings("unchecked")
 	public static DB newDB(String dbname, Properties properties) throws UnknownDBException
-      {
-	 ClassLoader classLoader = DBFactory.class.getClassLoader();
+	{
+		ClassLoader classLoader = DBFactory.class.getClassLoader();
 
-	 DB ret=null;
+		DB ret=null;
+		boolean wrapper = true;
+		try
+		{
+			Class dbclass = classLoader.loadClass(dbname);
+			System.out.println("dbclass.getName() = " + dbclass.getName());
 
-	 try 
-	 {
-	    Class dbclass = classLoader.loadClass(dbname);
-	    //System.out.println("dbclass.getName() = " + dbclass.getName());
-	    
-	    ret=(DB)dbclass.newInstance();
-	 }
-	 catch (Exception e) 
-	 {  
-	    e.printStackTrace();
-	    return null;
-	 }
-	 
-	 ret.setProperties(properties);
+			ret=(DB)dbclass.newInstance();
+			if (dbclass.getName().equals("com.yahoo.ycsb.db.AsyncMongoDbClient")) {
+				wrapper = false;
+			}
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+			return null;
+		}
 
-	 return new DBWrapper(ret);
-      }
-      
+		ret.setProperties(properties);
+		if (wrapper)
+			return new DBWrapper(ret);
+		return ret;
+	}
+
 }

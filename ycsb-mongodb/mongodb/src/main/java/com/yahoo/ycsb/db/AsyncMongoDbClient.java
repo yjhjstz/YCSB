@@ -25,7 +25,6 @@ import com.mongodb.async.client.MongoCollection;
 import com.mongodb.async.client.MongoDatabase;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
-import com.mongodb.connection.netty.NettyStreamFactoryFactory;
 import org.bson.Document;
 import com.mongodb.client.model.Filters;
 
@@ -33,14 +32,15 @@ import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.yahoo.ycsb.ByteArrayByteIterator;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.DB;
 import com.yahoo.ycsb.DBException;
+import com.yahoo.ycsb.measurements.Measurements;
 
 import static com.mongodb.client.model.Projections.*;
 import static com.mongodb.client.model.Filters.*;
 import static com.mongodb.client.model.Sorts.descending;
+
 
 /**
  * The QuickTour code example see: https://mongodb.github.io/mongo-java-driver/3.0/getting-started
@@ -53,9 +53,7 @@ public class AsyncMongoDbClient extends DB {
     private static MongoClient mongo;
 
     private static MongoDatabase db;
-
-    private static int serverCounter = 0;
-
+    
     /** The default write concern for the test. */
     private static WriteConcern writeConcern;
 
@@ -64,7 +62,6 @@ public class AsyncMongoDbClient extends DB {
 
     /** Allow inserting batches to save time during load */
     private static Integer BATCHSIZE;
-
 
     /** The database to access. */
     private static String database;
@@ -76,6 +73,9 @@ public class AsyncMongoDbClient extends DB {
      *  The default is 1, which is uncompressible */
     private static float compressibility = (float) 1.0;
 
+    private static final Measurements _measurements = Measurements.getMeasurements();
+
+    private static Integer dropData;
     /**
      * Initialize any state for this DB.
      * Called once per DB instance; there is one DB instance per client thread.
@@ -96,9 +96,8 @@ public class AsyncMongoDbClient extends DB {
 
             database = props.getProperty("mongodb.database", "ycsb");
 
-            // Set insert batchsize, default 1 - to be YCSB-original equivalent
-            final String batchSizeString = props.getProperty("batchsize", "1");
-            BATCHSIZE = Integer.parseInt(batchSizeString);
+            final String dropDataBase = props.getProperty("mongodb.drop", "0");
+            dropData = Integer.parseInt(dropDataBase);
 
             final String compressibilityString = props.getProperty("compressibility", "1");
             this.compressibility = Float.parseFloat(compressibilityString);
@@ -113,15 +112,16 @@ public class AsyncMongoDbClient extends DB {
                 }
                 db = mongo.getDatabase(database);
                 System.out.println("mongo connection created with " + urls);
-
-                final CountDownLatch dropLatch = new CountDownLatch(1);
-                db.drop(new SingleResultCallback<Void>() {
-                    @Override
-                    public void onResult(final Void result, final Throwable t) {
-                        dropLatch.countDown();
-                    }
-                });
-                dropLatch.await();
+                if (dropData == 1) {
+                    final CountDownLatch dropLatch = new CountDownLatch(1);
+                    db.drop(new SingleResultCallback<Void>() {
+                        @Override
+                        public void onResult(final Void result, final Throwable t) {
+                            dropLatch.countDown();
+                        }
+                    });
+                    dropLatch.await();
+                }
 
             } catch (Exception e1) {
                 System.err.println("Could not initialize MongoDB connection pool for Loader: "
@@ -135,11 +135,14 @@ public class AsyncMongoDbClient extends DB {
 
     @Override
     public void cleanup() throws DBException {
+        long st=System.nanoTime();
         if (initCount.decrementAndGet() <= 0) {
             try {
                 mongo.close();
             } catch (Exception e1) { /* ignore */ }
         }
+        long en=System.nanoTime();
+        _measurements.measure("CLEANUP", (int)((en-st)/1000));
     }
 
     private byte[] applyCompressibility(byte[] data){
@@ -158,14 +161,22 @@ public class AsyncMongoDbClient extends DB {
     @Override
     public int read(String table, String key, Set<String> field,
                     HashMap<String, ByteIterator> result) {
-        final CountDownLatch dropLatch = new CountDownLatch(1);
-        // find first
+        final long st = System.nanoTime();
         SingleResultCallback<Document> printDocument = new SingleResultCallback<Document>() {
             @Override
             public void onResult(final Document document, final Throwable t) {
-                //System.out.println(document.toJson());
-                //document.putAll(result);
-                dropLatch.countDown();
+                if (t != null) {
+                    System.err.println("Couldn't read key ");
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    return;
+                }
+                long en = System.nanoTime();
+                _measurements.measure("READ",(int)((en-st)/1000));
+                _measurements.reportReturnCode("READ", 0);
             }
         };
 
@@ -180,12 +191,6 @@ public class AsyncMongoDbClient extends DB {
                       .first(printDocument);
         }
 
-        try {
-            dropLatch.await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
         return 0;
     }
 
@@ -193,19 +198,29 @@ public class AsyncMongoDbClient extends DB {
     public int scan(String table, String startkey, int recordcount,
                     Set<String> field, Vector<HashMap<String, ByteIterator>> result) {
         try {
-            final CountDownLatch dropLatch = new CountDownLatch(1);
+            final long st=System.nanoTime();
             Block<Document> printDocumentBlock = new Block<Document>() {
                 @Override
                 public void apply(final Document document) {
-//                    HashMap<String, ByteIterator> item = new HashMap<String, ByteIterator>();
-//                    document.putAll(item);
-                    //result.add(item);
+
                 }
             };
             SingleResultCallback<Void> callbackWhenFinished = new SingleResultCallback<Void>() {
                 @Override
                 public void onResult(final Void result, final Throwable t) {
-                    dropLatch.countDown();
+                    if (t != null) {
+                        System.err.println("Couldn't scan key ");
+                        t.printStackTrace();
+                        try {
+                            Thread.sleep(1);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        return;
+                    }
+                    long en=System.nanoTime();
+                    _measurements.measure("SCAN",(int)((en-st)/1000));
+                    _measurements.reportReturnCode("SCAN", 0);
                 }
             };
             MongoCollection<Document> collection = db.getCollection(table);
@@ -215,30 +230,40 @@ public class AsyncMongoDbClient extends DB {
                     .projection(include(fieldNames))
                     .sort(descending("_id"))
                     .limit(recordcount)
-                    .forEach(printDocumentBlock,callbackWhenFinished);
+                    .forEach(printDocumentBlock, callbackWhenFinished);
 
 
-            dropLatch.await();
+
             return 0;
         }
         catch (Exception e) {
             System.err.println(e.toString());
             return 1;
         }
-        finally {
 
-        }
     }
 
     @Override
     public int update(String table, String key,
                       HashMap<String, ByteIterator> values) {
         try {
-            final CountDownLatch dropLatch = new CountDownLatch(1);
+            final long st = System.nanoTime();
             SingleResultCallback<UpdateResult> printDocument = new SingleResultCallback<UpdateResult>() {
                 @Override
                 public void onResult(final UpdateResult result, final Throwable t) {
-                    dropLatch.countDown();
+                    if (t != null) {
+                        System.err.println("Couldn't update key ");
+                        t.printStackTrace();
+                        try {
+                            Thread.sleep(1);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        return;
+                    }
+                    long en=System.nanoTime();
+                    _measurements.measure("UPDATE",(int)((en-st)/1000));
+                    _measurements.reportReturnCode("UPDATE", 0);
                 }
             };
             MongoCollection<Document> collection = db.getCollection(table);
@@ -250,8 +275,8 @@ public class AsyncMongoDbClient extends DB {
                 fieldsToSet.append(tmpKey, applyCompressibility(data));
             }
 
-            collection.updateOne(eq("_id", key), fieldsToSet, printDocument);
-            dropLatch.await();
+            collection.replaceOne(eq("_id", key), fieldsToSet, printDocument);
+
         } catch (Exception e) {
             System.err.println(e.toString());
             e.printStackTrace();
@@ -263,7 +288,9 @@ public class AsyncMongoDbClient extends DB {
     @Override
     public int insert(String table, String key,
                       HashMap<String, ByteIterator> values) {
-        final CountDownLatch dropLatch = new CountDownLatch(1);
+
+        final long st = System.nanoTime();
+        //final CountDownLatch dropLatch = new CountDownLatch(1);
         MongoCollection<Document> collection = db.getCollection(table);
         Document r = new Document("_id", key);
         for (String k : values.keySet()) {
@@ -276,36 +303,44 @@ public class AsyncMongoDbClient extends DB {
             public void onResult(final Void result, final Throwable t) {
                 if (t != null) {
                     System.err.println("Couldn't insert key ");
-                    t.printStackTrace();
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                     return;
                 }
-                dropLatch.countDown();
+                //dropLatch.countDown();
+                long en = System.nanoTime();
+                _measurements.measure("INSERT",(int)((en-st)/1000));
+                _measurements.reportReturnCode("INSERT", 0);
             }
         });
-        try {
-            dropLatch.await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+
         return 0;
 
     }
 
     @Override
     public int delete(String table, String key) {
-        final CountDownLatch dropLatch = new CountDownLatch(1);
+        final long st = System.nanoTime();
         MongoCollection<Document> collection = db.getCollection(table);
         collection.deleteOne(Filters.eq("_id", key), new SingleResultCallback<DeleteResult>() {
             @Override
             public void onResult(final DeleteResult result, final Throwable t) {
-                dropLatch.countDown();
+                if (t != null) {
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    return;
+                }
+                long en=System.nanoTime();
+                _measurements.measure("DELETE",(int)((en-st)/1000));
+                _measurements.reportReturnCode("DELETE", 0);
             }
         });
-        try {
-            dropLatch.await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
         return 0;
     }
 }
