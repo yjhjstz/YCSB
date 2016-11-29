@@ -17,9 +17,9 @@ requestdistribution=uniform
 fieldlength=64
 fieldcount=1
 
-target=10000
+#target=10000
 # refer to http://api.mongodb.com/java/3.1/?com/mongodb/ConnectionString.html
-mongodb.url=mongodb://127.0.0.1:7001/ycsb?maxPoolSize=1000&safe=true&streamtype=netty
+mongodb.url=mongodb://127.0.0.1:27017/ycsb?maxPoolSize=1000&safe=true&streamtype=netty&waitQueueMultiple=1
 mongodb.writeConcern=acknowledged
-threadcount=2
+threadcount=8
 mongodb.drop=1
