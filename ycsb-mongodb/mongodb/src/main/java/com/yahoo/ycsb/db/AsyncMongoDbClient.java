@@ -30,6 +30,7 @@ import com.mongodb.client.model.Filters;
 
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.yahoo.ycsb.ByteIterator;
@@ -76,6 +77,8 @@ public class AsyncMongoDbClient extends DB {
     private static final Measurements _measurements = Measurements.getMeasurements();
 
     private static Integer dropData;
+
+    private static Semaphore _semaphore = null;
     /**
      * Initialize any state for this DB.
      * Called once per DB instance; there is one DB instance per client thread.
@@ -123,6 +126,10 @@ public class AsyncMongoDbClient extends DB {
                     });
                     dropLatch.await();
                 }
+                // init semaphore count, control insert rate
+                int MaxWaitQueueSize = mongo.getSettings().getConnectionPoolSettings().getMaxWaitQueueSize();
+                System.out.println("max wait queue: " + MaxWaitQueueSize);
+                _semaphore = new Semaphore(MaxWaitQueueSize);
 
             } catch (Exception e1) {
                 System.err.println("Could not initialize MongoDB connection pool for Loader: "
@@ -158,10 +165,25 @@ public class AsyncMongoDbClient extends DB {
             data[i] = 0;
         return data;
     }
+    // control speed
+    private int acquireTicket() {
+        try {
+            _semaphore.acquire();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return 1;
+        }
+        return 0;
+    }
+
+    private void releaseTicket() {
+        _semaphore.release();
+    }
 
     @Override
     public int read(String table, String key, Set<String> field,
                     HashMap<String, ByteIterator> result) {
+        acquireTicket();
         final long st = System.nanoTime();
         SingleResultCallback<Document> printDocument = new SingleResultCallback<Document>() {
             @Override
@@ -174,6 +196,7 @@ public class AsyncMongoDbClient extends DB {
                 long en = System.nanoTime();
                 _measurements.measure("READ",(int)((en-st)/1000));
                 _measurements.reportReturnCode("READ", ret);
+                releaseTicket();
             }
         };
 
@@ -195,6 +218,7 @@ public class AsyncMongoDbClient extends DB {
     public int scan(String table, String startkey, int recordcount,
                     Set<String> field, Vector<HashMap<String, ByteIterator>> result) {
         try {
+            acquireTicket();
             final long st=System.nanoTime();
             Block<Document> printDocumentBlock = new Block<Document>() {
                 @Override
@@ -214,6 +238,7 @@ public class AsyncMongoDbClient extends DB {
                     long en=System.nanoTime();
                     _measurements.measure("SCAN",(int)((en-st)/1000));
                     _measurements.reportReturnCode("SCAN", ret);
+                    releaseTicket();
                 }
             };
             MongoCollection<Document> collection = db.getCollection(table);
@@ -224,8 +249,6 @@ public class AsyncMongoDbClient extends DB {
                     .sort(descending("_id"))
                     .limit(recordcount)
                     .forEach(printDocumentBlock, callbackWhenFinished);
-
-
 
             return 0;
         }
@@ -240,6 +263,7 @@ public class AsyncMongoDbClient extends DB {
     public int update(String table, String key,
                       HashMap<String, ByteIterator> values) {
         try {
+            acquireTicket();
             final long st = System.nanoTime();
             SingleResultCallback<UpdateResult> printDocument = new SingleResultCallback<UpdateResult>() {
                 @Override
@@ -253,6 +277,7 @@ public class AsyncMongoDbClient extends DB {
                     long en=System.nanoTime();
                     _measurements.measure("UPDATE",(int)((en-st)/1000));
                     _measurements.reportReturnCode("UPDATE", ret);
+                    releaseTicket();
                 }
             };
             MongoCollection<Document> collection = db.getCollection(table);
@@ -277,7 +302,7 @@ public class AsyncMongoDbClient extends DB {
     @Override
     public int insert(String table, String key,
                       HashMap<String, ByteIterator> values) {
-
+        acquireTicket();
         final long st = System.nanoTime();
 
         MongoCollection<Document> collection = db.getCollection(table);
@@ -294,12 +319,12 @@ public class AsyncMongoDbClient extends DB {
                 if (t != null) {
                     System.err.println("Couldn't insert key ");
                     ret = 1;
-                    //return;
                 }
 
                 long en = System.nanoTime();
                 _measurements.measure("INSERT",(int)((en-st)/1000));
                 _measurements.reportReturnCode("INSERT", ret);
+                releaseTicket();
             }
         });
 
@@ -309,6 +334,7 @@ public class AsyncMongoDbClient extends DB {
 
     @Override
     public int delete(String table, String key) {
+        acquireTicket();
         final long st = System.nanoTime();
         MongoCollection<Document> collection = db.getCollection(table);
         collection.deleteOne(Filters.eq("_id", key), new SingleResultCallback<DeleteResult>() {
@@ -321,6 +347,7 @@ public class AsyncMongoDbClient extends DB {
                 long en=System.nanoTime();
                 _measurements.measure("DELETE",(int)((en-st)/1000));
                 _measurements.reportReturnCode("DELETE", ret);
+                releaseTicket();
             }
         });
         return 0;
