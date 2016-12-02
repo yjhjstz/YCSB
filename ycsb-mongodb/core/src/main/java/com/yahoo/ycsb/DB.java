@@ -81,6 +81,10 @@ public abstract class DB
 	{
 	}
 
+	public void runCommand(String cmd)
+	{
+	}
+
 	/**
 	 * Read a record from the database. Each field/value pair from the result will be stored in a HashMap.
 	 *

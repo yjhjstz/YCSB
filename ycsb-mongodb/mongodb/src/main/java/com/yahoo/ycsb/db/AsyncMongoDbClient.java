@@ -344,13 +344,32 @@ public class AsyncMongoDbClient extends DB {
                 if (t != null) {
                     ret = 1;
                 }
-                long en=System.nanoTime();
-                _measurements.measure("DELETE",(int)((en-st)/1000));
+                long en = System.nanoTime();
+                _measurements.measure("DELETE", (int) ((en - st) / 1000));
                 _measurements.reportReturnCode("DELETE", ret);
                 releaseTicket();
             }
         });
         return 0;
+    }
+
+    @Override
+    public void runCommand(String cmd) {
+        acquireTicket();
+        final long st = System.nanoTime();
+        db.runCommand(new Document("ping", 1), new SingleResultCallback<Document>() {
+            @Override
+            public void onResult(final Document result, final Throwable t) {
+                int ret = 0;
+                if (t != null) {
+                    ret = 1;
+                }
+                long en = System.nanoTime();
+                _measurements.measure("CMD", (int) ((en - st) / 1000));
+                _measurements.reportReturnCode("CMD", ret);
+                releaseTicket();
+            }
+        });
     }
 }
 

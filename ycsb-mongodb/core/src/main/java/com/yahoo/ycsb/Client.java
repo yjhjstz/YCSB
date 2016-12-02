@@ -265,8 +265,11 @@ class ClientThread extends Thread
 
 				while (((_opcount == 0) || (_opsdone < _opcount)) && !_workload.isStopRequested())
 				{
-
-					if (!_workload.doInsert(_db,_workloadstate))
+					if (_workload.getCmdMode())
+					{
+						_workload.doRunCommand(_db);
+					}
+					else if (!_workload.doInsert(_db,_workloadstate))
 					{
 						break;
 					}

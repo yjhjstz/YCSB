@@ -41,6 +41,8 @@ public abstract class Workload
 	public static final String INSERT_START_PROPERTY_DEFAULT="0";
 	
 	private volatile AtomicBoolean stopRequested = new AtomicBoolean(false);
+
+      private boolean cmdMode = false;
 	
       /**
        * Initialize the scenario. Create any generators and other shared objects here.
@@ -64,7 +66,7 @@ public abstract class Workload
        */
       public Object initThread(Properties p, int mythreadid, int threadcount) throws WorkloadException
       {
-	 return new Integer(mythreadid);
+	        return new Integer(mythreadid);
       }
       
       /**
@@ -73,7 +75,10 @@ public abstract class Workload
       public void cleanup() throws WorkloadException
       {
       }
-      
+
+      public void doRunCommand(DB db)
+      {
+      }
       /**
        * Do one insert operation. Because it will be called concurrently from multiple client threads, this 
        * function must be thread safe. However, avoid synchronized, or the threads will block waiting for each 
@@ -108,5 +113,13 @@ public abstract class Workload
       public boolean isStopRequested() {
         if (stopRequested.get() == true) return true;
         else return false;
+      }
+
+      public void setCmdMode(boolean v) {
+            cmdMode = v;
+      }
+
+      public boolean getCmdMode() {
+            return cmdMode;
       }
 }

@@ -242,6 +242,13 @@ public class MutiWorkload extends Workload
      */
     public static final String HOTSPOT_OPN_FRACTION_DEFAULT = "0.8";
 
+
+    public static final String RUN_SIMPLE_COMMAND = "simplecommand";
+
+    public static final String RUN_SIMPLE_COMMAND_DEFAULT = "false";
+
+    boolean simplecommand;
+
     IntegerGenerator keysequence;
 
     DiscreteGenerator operationchooser;
@@ -306,6 +313,9 @@ public class MutiWorkload extends Workload
 
         readallfields=Boolean.parseBoolean(p.getProperty(READ_ALL_FIELDS_PROPERTY,READ_ALL_FIELDS_PROPERTY_DEFAULT));
         writeallfields=Boolean.parseBoolean(p.getProperty(WRITE_ALL_FIELDS_PROPERTY,WRITE_ALL_FIELDS_PROPERTY_DEFAULT));
+
+        simplecommand=Boolean.parseBoolean(p.getProperty(RUN_SIMPLE_COMMAND,RUN_SIMPLE_COMMAND_DEFAULT));
+        setCmdMode(simplecommand);
 
         if (p.getProperty(INSERT_ORDER_PROPERTY,INSERT_ORDER_PROPERTY_DEFAULT).compareTo("hashed")==0)
         {
@@ -402,6 +412,7 @@ public class MutiWorkload extends Workload
         {
             throw new WorkloadException("Distribution \""+scanlengthdistrib+"\" not allowed for scan length");
         }
+
     }
 
     public String buildKeyName(long keynum) {
@@ -565,7 +576,7 @@ public class MutiWorkload extends Workload
 
         long en=System.nanoTime();
 
-        Measurements.getMeasurements().measure("READ-MODIFY-WRITE", (int)((en-st)/1000));
+        Measurements.getMeasurements().measure("READ-MODIFY-WRITE", (int) ((en - st) / 1000));
     }
 
     public void doTransactionScan(DB db, Object threadstate)
@@ -589,7 +600,7 @@ public class MutiWorkload extends Workload
             fields.add(fieldname);
         }
         String tb = table + ((Integer)threadstate).toString();
-        db.scan(tb,startkeyname,len,fields,new Vector<HashMap<String,ByteIterator>>());
+        db.scan(tb, startkeyname, len, fields, new Vector<HashMap<String, ByteIterator>>());
     }
 
     public void doTransactionUpdate(DB db, Object threadstate)
@@ -612,7 +623,7 @@ public class MutiWorkload extends Workload
             values = buildUpdate();
         }
         String tb = table + ((Integer)threadstate).toString();
-        db.update(tb,keyname,values);
+        db.update(tb, keyname, values);
     }
 
     public void doTransactionInsert(DB db, Object threadstate)
@@ -623,6 +634,11 @@ public class MutiWorkload extends Workload
         String dbkey = buildKeyName(keynum);
         String tb = table + ((Integer)threadstate).toString();
         HashMap<String, ByteIterator> values = buildValues();
-        db.insert(tb,dbkey,values);
+        db.insert(tb, dbkey, values);
+    }
+
+    @Override
+    public void doRunCommand(DB db) {
+        db.runCommand(null);
     }
 }
