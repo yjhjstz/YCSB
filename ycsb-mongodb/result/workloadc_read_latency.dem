@@ -1,0 +1,14 @@
+set terminal png
+set output 'workloadc_read_latency.png'
+set key inside right top vertical Right noreverse noenhanced autotitle nobox
+set datafile missing '-'
+set style data linespoints
+set xtics border in scale 1,0.5 nomirror rotate by -45  autojustify
+set xtics  norangelimit
+set xtics   ()
+set xlabel "connections"
+set ylabel "latency(us)"
+set title "workloadc (100% read)"
+x = 0.0
+i = 22
+plot 'workloadc_read_latency.dat' using 2:xtic(1) title columnheader(2), for [i=3:4] '' using i title columnheader(i)
