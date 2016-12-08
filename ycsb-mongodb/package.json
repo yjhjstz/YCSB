@@ -11,7 +11,7 @@
     "socket.io": "1.7.1"
   },
   "scripts": {
-    "prestart": "nohup anywhere&",
-    "start": "node index.js"
+    "prestart": "pm2 start anywhere",
+    "start": "pm2 start index.js"
   }
 }
