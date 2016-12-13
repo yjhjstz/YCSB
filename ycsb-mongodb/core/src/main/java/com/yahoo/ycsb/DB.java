@@ -85,6 +85,11 @@ public abstract class DB
 	{
 	}
 
+	public void warmUp() {}
+
+	public boolean ready() {
+		return true;
+	}
 	/**
 	 * Read a record from the database. Each field/value pair from the result will be stored in a HashMap.
 	 *

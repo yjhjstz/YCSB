@@ -42,7 +42,8 @@ import static com.mongodb.client.model.Projections.*;
 import static com.mongodb.client.model.Filters.*;
 import static com.mongodb.client.model.Sorts.descending;
 
-
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 /**
  * The QuickTour code example see: https://mongodb.github.io/mongo-java-driver/3.0/getting-started
  */
@@ -130,10 +131,6 @@ public class AsyncMongoDbClient extends DB {
                 int MaxWaitQueueSize = mongo.getSettings().getConnectionPoolSettings().getMaxWaitQueueSize();
                 System.out.println("max wait queue: " + MaxWaitQueueSize);
                 _semaphore = new Semaphore(MaxWaitQueueSize);
-                for (int i = 0; i < MaxWaitQueueSize; i++) {
-                    warmUp();
-                }
-                System.err.println("warn-up end.");
 
             } catch (Exception e1) {
                 System.err.println("Could not initialize MongoDB connection pool for Loader: "
@@ -380,15 +377,47 @@ public class AsyncMongoDbClient extends DB {
         });
     }
 
-
+    @Override
     public void warmUp() {
-        //acquireTicket();
+        acquireTicket();
         db.runCommand(new Document("ping", 1), new SingleResultCallback<Document>() {
             @Override
             public void onResult(final Document result, final Throwable t) {
-                //releaseTicket();
+                releaseTicket();
             }
         });
+
     }
+
+    @Override
+    public boolean ready() {
+        acquireTicket();
+        final CountDownLatch dropLatch = new CountDownLatch(1);
+        final long[] cc = {0};
+        db.runCommand(new Document("serverStatus", 1), new SingleResultCallback<Document>() {
+            @Override
+            public void onResult(final Document result, final Throwable t) {
+
+                if (t == null) {
+                    final Document conn =  (Document)result.get("connections");
+                    JSONObject jsonObject = (JSONObject)JSONValue.parse(conn.toJson());
+                    cc[0] = (Long)jsonObject.get("current");
+                }
+                releaseTicket();
+                dropLatch.countDown();
+            }
+        });
+        try {
+            dropLatch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        long maxC = mongo.getSettings().getConnectionPoolSettings().getMaxWaitQueueSize();
+        boolean ready = cc[0] >= maxC - 1;
+        System.err.println("current conn: " + cc[0] + ", ready:" + ready);
+        return ready ;
+    }
+
 }
 
