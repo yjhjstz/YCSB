@@ -144,14 +144,13 @@ public class AsyncMongoDbClient extends DB {
 
     @Override
     public void cleanup() throws DBException {
-        //long st=System.nanoTime();
+
         if (initCount.decrementAndGet() <= 0) {
             try {
                 mongo.close();
             } catch (Exception e1) { /* ignore */ }
         }
-        //long en=System.nanoTime();
-        //_measurements.measure("CLEANUP", (int)((en-st)/1000));
+
     }
 
     private byte[] applyCompressibility(byte[] data){
@@ -414,7 +413,7 @@ public class AsyncMongoDbClient extends DB {
         }
 
         long maxC = mongo.getSettings().getConnectionPoolSettings().getMaxWaitQueueSize();
-        boolean ready = cc[0] >= maxC - 1;
+        boolean ready = cc[0] >= maxC - 5;
         System.err.println("current conn: " + cc[0] + ", ready:" + ready);
         return ready ;
     }

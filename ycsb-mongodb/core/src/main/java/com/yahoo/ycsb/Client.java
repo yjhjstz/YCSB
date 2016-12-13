@@ -383,16 +383,6 @@ class ClientThread extends Thread
 			System.exit(0);
 		}
 
-		try
-		{
-			_db.cleanup();
-		}
-		catch (DBException e)
-		{
-			e.printStackTrace();
-			e.printStackTrace(System.out);
-			return;
-		}
 	}
 }
 
@@ -786,6 +776,7 @@ public class Client
 
 		Vector<Thread> threads=new Vector<Thread>();
 		Vector<Thread> warmup=new Vector<Thread>();
+		Vector<DB> dbs = new Vector<DB>();
 
 		for (int threadid=0; threadid<threadcount; threadid++)
 		{
@@ -795,6 +786,7 @@ public class Client
 			{
 				db=DBFactory.newDB(dbname,props);
 				db.init();
+				dbs.add(db);
 			}
 			catch (UnknownDBException e)
 			{
@@ -860,6 +852,7 @@ public class Client
     
     int opsDone = 0;
 
+
 		for (Thread t : threads)
 		{
 			try
@@ -875,8 +868,8 @@ public class Client
 		long en=System.currentTimeMillis();
 		
 		if (terminator != null && !terminator.isInterrupted()) {
-      terminator.interrupt();
-    }
+      		terminator.interrupt();
+    	}
 
 		if (status)
 		{
@@ -885,6 +878,9 @@ public class Client
 
 		try
 		{
+			for (DB _db : dbs) {
+				_db.cleanup();
+			}
 			workload.cleanup();
 		}
 		catch (WorkloadException e)
@@ -892,6 +888,12 @@ public class Client
 			e.printStackTrace();
 			e.printStackTrace(System.out);
 			System.exit(0);
+		}
+		catch (DBException e)
+		{
+			e.printStackTrace();
+			e.printStackTrace(System.out);
+			return;
 		}
 
 		try
