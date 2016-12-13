@@ -130,6 +130,10 @@ public class AsyncMongoDbClient extends DB {
                 int MaxWaitQueueSize = mongo.getSettings().getConnectionPoolSettings().getMaxWaitQueueSize();
                 System.out.println("max wait queue: " + MaxWaitQueueSize);
                 _semaphore = new Semaphore(MaxWaitQueueSize);
+                for (int i = 0; i < MaxWaitQueueSize; i++) {
+                    warmUp();
+                }
+                System.err.println("warn-up end.");
 
             } catch (Exception e1) {
                 System.err.println("Could not initialize MongoDB connection pool for Loader: "
@@ -193,10 +197,11 @@ public class AsyncMongoDbClient extends DB {
                     System.err.println("Couldn't read key ");
                     ret = 1;
                 }
-                long en = System.nanoTime();
-                _measurements.measure("READ",(int)((en-st)/1000));
-                _measurements.reportReturnCode("READ", ret);
                 releaseTicket();
+                long en = System.nanoTime();
+                _measurements.measure("READ", (int)((en-st)/1000));
+                _measurements.reportReturnCode("READ", ret);
+
             }
         };
 
@@ -235,10 +240,11 @@ public class AsyncMongoDbClient extends DB {
                         t.printStackTrace();
                         ret = 1;
                     }
-                    long en=System.nanoTime();
-                    _measurements.measure("SCAN",(int)((en-st)/1000));
-                    _measurements.reportReturnCode("SCAN", ret);
                     releaseTicket();
+                    long en=System.nanoTime();
+                    _measurements.measure("SCAN", (int)((en-st)/1000));
+                    _measurements.reportReturnCode("SCAN", ret);
+
                 }
             };
             MongoCollection<Document> collection = db.getCollection(table);
@@ -274,10 +280,11 @@ public class AsyncMongoDbClient extends DB {
                         t.printStackTrace();
                         ret = 1;
                     }
-                    long en=System.nanoTime();
-                    _measurements.measure("UPDATE",(int)((en-st)/1000));
-                    _measurements.reportReturnCode("UPDATE", ret);
                     releaseTicket();
+                    long en=System.nanoTime();
+                    _measurements.measure("UPDATE", (int)((en-st)/1000));
+                    _measurements.reportReturnCode("UPDATE", ret);
+
                 }
             };
             MongoCollection<Document> collection = db.getCollection(table);
@@ -320,11 +327,11 @@ public class AsyncMongoDbClient extends DB {
                     System.err.println("Couldn't insert key ");
                     ret = 1;
                 }
-
-                long en = System.nanoTime();
-                _measurements.measure("INSERT",(int)((en-st)/1000));
-                _measurements.reportReturnCode("INSERT", ret);
                 releaseTicket();
+                long en = System.nanoTime();
+                _measurements.measure("INSERT", (int)((en-st)/1000));
+                _measurements.reportReturnCode("INSERT", ret);
+
             }
         });
 
@@ -344,10 +351,11 @@ public class AsyncMongoDbClient extends DB {
                 if (t != null) {
                     ret = 1;
                 }
+                releaseTicket();
                 long en = System.nanoTime();
                 _measurements.measure("DELETE", (int) ((en - st) / 1000));
                 _measurements.reportReturnCode("DELETE", ret);
-                releaseTicket();
+
             }
         });
         return 0;
@@ -364,10 +372,21 @@ public class AsyncMongoDbClient extends DB {
                 if (t != null) {
                     ret = 1;
                 }
+                releaseTicket();
                 long en = System.nanoTime();
                 _measurements.measure("CMD", (int) ((en - st) / 1000));
                 _measurements.reportReturnCode("CMD", ret);
-                releaseTicket();
+            }
+        });
+    }
+
+
+    public void warmUp() {
+        //acquireTicket();
+        db.runCommand(new Document("ping", 1), new SingleResultCallback<Document>() {
+            @Override
+            public void onResult(final Document result, final Throwable t) {
+                //releaseTicket();
             }
         });
     }
