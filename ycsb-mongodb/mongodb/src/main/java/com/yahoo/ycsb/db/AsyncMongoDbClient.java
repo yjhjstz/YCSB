@@ -413,7 +413,7 @@ public class AsyncMongoDbClient extends DB {
         }
 
         long maxC = mongo.getSettings().getConnectionPoolSettings().getMaxWaitQueueSize();
-        boolean ready = cc[0] >= maxC - 5;
+        boolean ready = cc[0] >= maxC - 10;
         System.err.println("current conn: " + cc[0] + ", ready:" + ready);
         return ready ;
     }
