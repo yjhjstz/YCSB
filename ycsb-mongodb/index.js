@@ -4,6 +4,7 @@ var express = require('express');
 var app = express();
 var server = require('http').createServer(app);
 var io = require('socket.io')(server);
+var program = require('commander');
 var port = process.env.PORT || 3000;
 
 
@@ -31,34 +32,50 @@ var getIPAddress = function () {
 // Channels
 var numUsers = 0;
 
-function help(socket) {
-  var usage = ["Usage:", "run : run benchmark", "help : help usage"];
-  usage.forEach(function(element) {
+function slack(socket, data) {
+  var args = data.split(' ');
+  // adapt to commander
+  args.unshift('node', 'index.js');
+  var env = Object.create(process.env);
+  program
+  .version('0.0.1')
+  .command('run <workload> <host:port>')
+  .action(function (workload, host) {
+    console.log("action");
+    if (workload) {
+      env.workload = workload;
+    }
+    if (host) {
+      env.host = host;
+    }
+    var exec = spawn('sh',['run.sh'], {env: env});
+    exec.stdout.on('data', (result) => {
+      io.sockets.emit('new message', {
+        username: socket.username,
+        message: result.toString()
+      });
+    });
+
+    exec.on('close', (code) => {
+      io.sockets.emit('new message', {
+        username: socket.username,
+        message: "Done, get result  Redirect to: http://" + getIPAddress() +":8000"
+      });
+    });
+
+  });
+
+  program.on('help', function() {
+    var help = ' Usage:';
+    help += '\r\n'
+    help += 'run workload ip:port';
+    help += '\r\n'
     socket.emit('new message', {
-      username: socket.username,
-      message: element
+        username: socket.username,
+        message: help
     });
   });
-}
-
-function slack(socket, data) {
-  if (data === "run") {
-      var ls = spawn('./run.sh');
-      ls.stdout.on('data', (result) => {
-        socket.emit('new message', {
-          username: socket.username,
-          message: result.toString()
-        });
-      });
-      ls.on('close', (code) => {
-        socket.emit('new message', {
-          username: socket.username,
-          message: "Done, get result  Redirect to: http://" + getIPAddress() +":8000"
-        });
-      });
-  } else {
-    help(socket);
-  }
+  program.parse(args);
 }
 
 
