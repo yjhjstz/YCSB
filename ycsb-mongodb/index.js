@@ -39,9 +39,8 @@ function slack(socket, data) {
   var env = Object.create(process.env);
   program
   .version('0.0.1')
-  .command('run <workload> <host:port>')
+  .command('run [workload] [host:port]')
   .action(function (workload, host) {
-    console.log("action");
     if (workload) {
       env.workload = workload;
     }
