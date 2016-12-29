@@ -5,9 +5,21 @@ var app = express();
 var server = require('http').createServer(app);
 var io = require('socket.io')(server);
 var program = require('commander');
+var mongo = require('mongodb');
+var Grid = require('gridfs-stream');
+var fs = require('fs');
+var MongoClient = mongo.MongoClient;
+
+var url = 'mongodb://localhost:27017/myproject';
+var database = null;
+// Use connect method to connect to the Server
+MongoClient.connect(url, function(err, db) {
+  console.log("Connected correctly to mongodb server.");
+  // create or use an existing mongodb-native db instance
+  database = db;
+});
+
 var port = process.env.PORT || 3000;
-
-
 server.listen(port, function () {
   console.log('mini-Slack server listening at port %d', port);
 });
@@ -41,22 +53,49 @@ function slack(socket, data) {
   .version('0.0.1')
   .command('run [workload] [host:port]')
   .action(function (workload, host) {
-    if (workload) {
-      env.workload = workload;
-    }
+    workload = workload || 'workloada';
+    env.workload = workload;
     if (host) {
       env.host = host;
     }
+
     var exec = spawn('sh',['run.sh'], {env: env});
     exec.stdout.on('data', (result) => {
-      io.sockets.emit('new message', {
+      socket.emit('new message', {
         username: socket.username,
         message: result.toString()
       });
     });
 
     exec.on('close', (code) => {
-      io.sockets.emit('new message', {
+      var gfs = Grid(database, mongo);
+      // streaming to gridfs
+      fs.readdir("result/image/",function(err, files){
+       if (err) {
+           return console.error(err);
+       }
+       files.forEach( function (file){
+            if (file.indexOf(workload) == -1) {
+                return;
+            }
+            var writestream = gfs.createWriteStream({
+                filename: file,
+                content_type: 'image/png',
+                metadata: {
+                    time: (new Date()).toLocaleString(),
+                    workload: workload,
+                    ip: host
+                }
+            });
+            fs.createReadStream('result/image/' + file).pipe(writestream);
+            writestream.on('close', function() {
+                console.log( file );
+            });
+
+       });
+      });
+
+      socket.emit('new message', {
         username: socket.username,
         message: "Done, get result  Redirect to: http://" + getIPAddress() +":8000"
       });
