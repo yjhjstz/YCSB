@@ -78,27 +78,29 @@ function slack(socket, data) {
             if (file.indexOf(workload) == -1) {
                 return;
             }
+            var t = new Date();
+            var filename = (t - 0) + '_' + file;
             var writestream = gfs.createWriteStream({
-                filename: file,
+                filename: filename,
                 content_type: 'image/png',
                 metadata: {
-                    time: (new Date()).toLocaleString(),
+                    time: t.toLocaleString(),
                     workload: workload,
                     ip: host
                 }
             });
             fs.createReadStream('result/image/' + file).pipe(writestream);
             writestream.on('close', function() {
-                console.log( file );
+                io.sockets.emit('new message', {
+                  username: socket.username,
+                  message: "Done, get result redirect to: http://" + getIPAddress() +"/pics/" + filename
+                });
             });
 
        });
       });
 
-      socket.emit('new message', {
-        username: socket.username,
-        message: "Done, get result  Redirect to: http://" + getIPAddress() +":8000"
-      });
+      
     });
 
   });
